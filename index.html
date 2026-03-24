@@ -1,30 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mic Test - Coach Vallas</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Vallas AI</title>
     <style>
-        body { font-family: Arial; text-align: center; padding: 40px; }
-        button { padding: 15px 30px; font-size: 18px; cursor: pointer; margin: 10px; }
-        #status { margin-top: 20px; font-size: 16px; color: #333; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; background: #f9fafb; }
+        .header { padding: 12px 16px; background: #1a3a2a; color: white; display: flex; align-items: center; gap: 10px; }
+        .header img { width: 36px; height: 36px; border-radius: 50%; background: #2d6a4f; }
+        .header .name { font-weight: 600; font-size: 15px; }
+        .header .status { font-size: 12px; color: #a7c4b5; }
+        .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+        .msg.bot { background: white; border: 1px solid #e5e7eb; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg.user { background: #1a3a2a; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg .sender { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .typing { align-self: flex-start; padding: 10px 14px; background: white; border: 1px solid #e5e7eb; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 14px; color: #888; display: none; }
+        .typing span { animation: blink 1.4s infinite; }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%,60%,100%{opacity:0.2} 30%{opacity:1} }
+        .input-bar { padding: 12px 16px; background: white; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; align-items: center; }
+        .input-bar input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 24px; font-size: 14px; outline: none; }
+        .input-bar input:focus { border-color: #1a3a2a; }
+        .btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-send { background: #1a3a2a; color: white; }
+        .btn-mic { background: #f3f4f6; color: #333; }
+        .btn-mic.recording { background: #ef4444; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .mic-status { font-size: 11px; color: #ef4444; text-align: center; padding: 4px; display: none; }
     </style>
 </head>
 <body>
-    <h2>Microphone Permission Test</h2>
-    <p>Click the button to test if microphone works inside iframe</p>
-    <button id="micBtn">Request Microphone</button>
-    <div id="status">Status: waiting...</div>
+    <div class="header">
+        <div style="width:36px;height:36px;border-radius:50%;background:#2d6a4f;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;">PV</div>
+        <div>
+            <div class="name">Coach Vallas AI</div>
+            <div class="status">School Financial Planning</div>
+        </div>
+    </div>
+
+    <div class="messages" id="messages">
+        <div class="msg bot">
+            <div class="sender">Coach Vallas</div>
+            Welcome! I'm Coach Vallas, your AI guide for school financial planning. I'll walk you through the Vallas methodology for balancing budgets while financing educational reform.<br><br>
+            What district are you working in, and what's the biggest financial challenge you're facing right now?
+        </div>
+    </div>
+    <div class="typing" id="typing"><span>.</span><span>.</span><span>.</span></div>
+    <div class="mic-status" id="micStatus">Listening...</div>
+
+    <div class="input-bar">
+        <button class="btn btn-mic" id="micBtn" title="Voice input">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <input type="text" id="input" placeholder="Type a message..." autocomplete="off">
+        <button class="btn btn-send" id="sendBtn" title="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+    </div>
 
     <script>
-        document.getElementById('micBtn').addEventListener('click', async () => {
-            const status = document.getElementById('status');
+        const messages = document.getElementById('messages');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const typing = document.getElementById('typing');
+        const micStatus = document.getElementById('micStatus');
+
+        // Hardcoded responses
+        const responses = [
+            "That's a great question. In my experience transforming districts in Chicago and Philadelphia, the first step is always a comprehensive financial discovery. You need to understand exactly where money is going before you can redirect it. Have you done a full audit of your district's expenditures in the past year?",
+            "I've seen this exact pattern in dozens of districts. The key principle is: no new spending without new revenue. You need to compartmentalize your budget — operating budget strictly protected, grants budget separate, capital budget with dedicated revenues. This is what I call 'watertight compartments.' Would you like me to walk you through how to set this up?",
+            "Absolutely. The Five Essential Practices framework is critical here. Start with guaranteeing an essential curriculum aligned to high standards. Then create a climate conducive to learning. Most districts skip straight to monitoring achievement without laying this groundwork first. Which of these five practices does your district struggle with most?",
+            "Transportation and special education are the two biggest cost traps I see. In one district, we found $86 million in savings that were never realized. Start by looking at route optimization and staffing models aligned to IEP-driven needs, not historical patterns. Can you share your current transportation budget?",
+            "This is exactly why I developed the organic budget approach. Use conservative five-year financial planning, flexible staffing with retirees and part-time employees, and multi-year leasing strategies. The goal is to create a budget that gets more flexible over time, not more rigid. Let's draft a five-year outline for your district."
+        ];
+        let responseIndex = 0;
+
+        function addMessage(text, isUser) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + (isUser ? 'user' : 'bot');
+            if (!isUser) div.innerHTML = '<div class="sender">Coach Vallas</div>' + text;
+            else div.textContent = text;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function sendMessage(text) {
+            if (!text.trim()) return;
+            addMessage(text, true);
+            input.value = '';
+            typing.style.display = 'block';
+            messages.scrollTop = messages.scrollHeight;
+            setTimeout(() => {
+                typing.style.display = 'none';
+                addMessage(responses[responseIndex % responses.length], false);
+                responseIndex++;
+            }, 1500);
+        }
+
+        sendBtn.addEventListener('click', () => sendMessage(input.value));
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(input.value); });
+
+        // Voice
+        let recording = false;
+        let mediaRecorder = null;
+
+        micBtn.addEventListener('click', async () => {
+            if (recording) {
+                recording = false;
+                micBtn.classList.remove('recording');
+                micStatus.style.display = 'none';
+                if (mediaRecorder) mediaRecorder.stop();
+                return;
+            }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                status.textContent = 'Status: Microphone ACCESS GRANTED';
-                status.style.color = 'green';
-                stream.getTracks().forEach(t => t.stop());
+                recording = true;
+                micBtn.classList.add('recording');
+                micStatus.style.display = 'block';
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                // Auto stop after 10s
+                setTimeout(() => { if (recording) micBtn.click(); }, 10000);
+                mediaRecorder.onstop = () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    // Simulate voice transcription
+                    const fakeTranscripts = [
+                        "How do I start a financial discovery for my district?",
+                        "What are the Five Essential Practices you mentioned?",
+                        "Can you help me with budget compartmentalization?",
+                        "We're spending too much on transportation, what should we do?"
+                    ];
+                    sendMessage(fakeTranscripts[responseIndex % fakeTranscripts.length]);
+                };
             } catch (e) {
-                status.textContent = 'Status: Microphone DENIED - ' + e.message;
-                status.style.color = 'red';
+                alert('Microphone access denied: ' + e.message);
             }
         });
     </script>
